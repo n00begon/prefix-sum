@@ -1,13 +1,15 @@
 extends Node2D
 const MIN_INT: int = 1
-const MAX_INT: int = 1
+const MAX_INT: int = 100
+const ARRAY_SIZE = 1000000
 
 func _ready() -> void:
-	var first = _create_array(50)
+	var first = _create_array(ARRAY_SIZE)
 	var check = _sum(first)
-	prints(check, first)
+	var before = Time.get_ticks_msec()
 	var result = _gdscript_prefix_sum(first)
-	prints ("Numbers", result[result.size() -1] == check, result)
+	var time = Time.get_ticks_msec() - before
+	prints ("GDScript", time, result[result.size() -1] == check)
 
 func _sum(numbers: Array[int]) -> int:
 	var total: int = 0
