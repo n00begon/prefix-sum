@@ -1,7 +1,7 @@
 extends Node2D
 const MIN_INT: int = 1
 const MAX_INT: int = 1
-const SIZE: int = 100000
+const SIZE: int = 10000000
 const RANDOM: bool = false
 
 func _ready() -> void:
@@ -13,7 +13,8 @@ func _ready() -> void:
 	timed_run("GDScript Blelloch Singlethread Gem", original.duplicate_deep(), check, gdscript_blelloch_singlethread_gem)
 	timed_run("GDScript Blelloch Singlethread Named", original.duplicate_deep(), check, gdscript_blelloch_singlethread_named)
 	timed_run("GDScript Blelloch Multithreaded", original.duplicate_deep(), check, gdscript_blelloch_multithreaded)
-
+	timed_run("GDScript Blocks", original.duplicate_deep(), check, blocks)
+	
 func create_check_array(numbers: Array[int]) -> Array[int]:
 	var total: int = 0
 	for i in numbers:
@@ -222,3 +223,39 @@ func _downsweep(index: int, stepSize: int, numbers: Array[int]) -> void:
 	var temp = numbers[second]
 	numbers[second] = numbers[first] + numbers[second]
 	numbers[first] = temp
+
+func blocks(numbers: Array[int]) -> Array[int]:
+	var blockSize = 1024
+	
+	# Skip threads if it can be done in one block
+	if numbers.size() <= blockSize:
+		return gdscript_linear(numbers)
+
+	var elements: int = ceil(float(numbers.size())/blockSize)
+	var offsets: Array[int] = []
+	offsets.resize(elements + 1)
+
+	var sum_callable = Callable(self, "_block_sum").bind(blockSize, numbers, offsets)
+	var sum_taskId = WorkerThreadPool.add_group_task(sum_callable, elements)
+	WorkerThreadPool.wait_for_group_task_completion(sum_taskId)
+	
+	offsets = blocks(offsets)
+	
+	var offset_callable = Callable(self, "_block_offset").bind(blockSize, numbers, offsets)
+	var offset_taskId = WorkerThreadPool.add_group_task(offset_callable, elements)
+	WorkerThreadPool.wait_for_group_task_completion(offset_taskId)
+	
+	return numbers
+
+func _block_sum(block: int, blocksize: int, numbers: Array[int], offsets: Array[int]) -> void:
+	var start = blocksize * block
+	var end = min(start + blocksize, numbers.size())
+	for i in range(start + 1, end):
+		numbers[i] += numbers[i - 1]
+	offsets[block + 1] = numbers[end - 1]
+
+func _block_offset(block: int, blocksize: int, numbers: Array[int], offsets: Array[int]) -> void:
+	var start = blocksize * block
+	var end = min(start + blocksize, numbers.size())
+	for i in range(start, end):
+		numbers[i] += offsets[block]
